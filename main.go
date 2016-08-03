@@ -81,13 +81,10 @@ func main() {
 
 	// get first list from *flagGall
 	ticker := time.Tick(duration)
-	for {
-		select {
-		case <-ticker:
-			log.Printf("goinside.GetList(%s, 1) called.\n", *flagGall)
-			if list, err := goinside.GetList(*flagGall, 1); err == nil {
-				go iterArticles(list.Articles)
-			}
+	for _ = range ticker {
+		log.Printf("goinside.GetList(%s, 1) called.\n", *flagGall)
+		if list, err := goinside.GetList(*flagGall, 1); err == nil {
+			go iterArticles(list.Articles)
 		}
 	}
 }
