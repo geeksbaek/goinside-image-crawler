@@ -24,7 +24,7 @@ import (
 var (
 	flagGall              = flag.String("gall", "", "http://m.dcinside.com/list.php?id=programming")
 	defaultImageDirectory = "image"
-	duration              = time.Second * 3
+	duration              = time.Second * 5
 
 	history = struct {
 		article map[string]bool
@@ -127,10 +127,11 @@ func process(URL, articleNumber string) error {
 
 	switch {
 	// if you already seen this article, return error
-	case history.article[articleNumber] != false:
+	case history.article[articleNumber] == true:
 		return errors.New("this article already seen")
 	// if the image do not duplicated, return error
-	case history.image[checksum] != false:
+	case history.image[checksum] == true:
+		history.article[articleNumber] = true
 		return errors.New("it's a duplicated image")
 	}
 
