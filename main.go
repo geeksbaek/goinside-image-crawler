@@ -1,7 +1,3 @@
-/*
-   goinsideImageCrawler.exe -gall=[갤러리 URL]
-*/
-
 package main
 
 import (
@@ -41,9 +37,27 @@ var (
 	}
 )
 
+func init() {
+	os.Mkdir(defaultImageDirectory, 0700)
+	root, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		panic(err)
+	}
+	filepath.Walk(root+"/"+defaultImageDirectory, func(path string, f os.FileInfo, err error) error {
+		if checksum, err := fileToMD5(path); err == nil {
+			history.mutex.Lock()
+			defer history.mutex.Unlock()
+			history.image[checksum] = true
+		}
+		return nil
+	})
+}
+
 func main() {
 	flag.Parse()
-	initialize()
+	if *flagGall == "" {
+		log.Fatal("invalid args")
+	}
 
 	log.Printf("target is %s, crawl start.\n", *flagGall)
 
@@ -58,22 +72,6 @@ func main() {
 			}
 		}
 	}
-}
-
-func initialize() {
-	os.Mkdir(defaultImageDirectory, 0700)
-	root, err := filepath.Abs(filepath.Dir(os.Args[0]))
-	if err != nil {
-		panic(err)
-	}
-	filepath.Walk(root+"/"+defaultImageDirectory, func(path string, f os.FileInfo, err error) error {
-		if checksum, err := fileToMD5(path); err == nil {
-			history.mutex.Lock()
-			defer history.mutex.Unlock()
-			history.image[checksum] = true
-		}
-		return nil
-	})
 }
 
 func iterArticles(articles []*goinside.Article) {
