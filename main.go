@@ -2,7 +2,7 @@
    goinsideImageCrawler.exe -gall=[갤러리 URL]
 */
 
-package main
+package goinsideimagecrawler
 
 import (
 	"bytes"
