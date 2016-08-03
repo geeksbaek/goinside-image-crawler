@@ -150,7 +150,7 @@ func process(URL string) error {
 
 	// if the image do not duplicated, return error
 	if history.image.get(checksum) == true {
-		return errDuplicate
+		return errDuplicateImage
 	}
 
 	// save it.
