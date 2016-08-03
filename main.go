@@ -50,6 +50,11 @@ var (
 		article: &mutexMap{map[string]bool{}, new(sync.RWMutex)},
 		image:   &mutexMap{map[string]bool{}, new(sync.RWMutex)},
 	}
+
+	errDuplicateImage      = errors.New("duplicated image")
+	errCannotFoundID       = errors.New("cannot found id from url")
+	errCannotFoundNo       = errors.New("cannot found no from url")
+	errCannotFoundFilename = errors.New("cannot found filename from content-position")
 )
 
 func init() {
@@ -93,14 +98,12 @@ func iterArticles(articles []*goinside.Article) {
 		if !article.HasImage {
 			continue
 		}
-
-		// fetching the article,
-		article, err := goinside.GetArticle(article.URL)
-		if err != nil {
-			continue
-		}
-		// and passing the images to process()
 		go func(article *goinside.Article) {
+			// fetching the article,
+			article, err := goinside.GetArticle(article.URL)
+			if err != nil {
+				return
+			}
 			// if you already seen this article, return function
 			if history.article.get(article.Number) == true {
 				return
@@ -108,8 +111,9 @@ func iterArticles(articles []*goinside.Article) {
 
 			log.Printf("#%v article has an image. process start.\n", article.Number)
 
+			// if not, passing the images to process()
 			for _, imageURL := range article.Images {
-				if err := process(imageURL, article.Number); err != nil {
+				if err := process(imageURL); err != nil && err != errDuplicateImage {
 					log.Printf("#%v article process failed. %v", article.Number, err)
 					return
 				}
@@ -122,7 +126,7 @@ func iterArticles(articles []*goinside.Article) {
 	}
 }
 
-func process(URL, articleNumber string) error {
+func process(URL string) error {
 	// first, fetching image
 	resp, err := fetchImage(URL)
 	if err != nil {
@@ -146,7 +150,7 @@ func process(URL, articleNumber string) error {
 
 	// if the image do not duplicated, return error
 	if history.image.get(checksum) == true {
-		return errors.New("it's a duplicated image")
+		return errDuplicate
 	}
 
 	// save it.
@@ -169,13 +173,13 @@ func fetchImage(URL string) (*http.Response, error) {
 	idRe := regexp.MustCompile(`id=([^&]*)`)
 	idMatched := idRe.FindStringSubmatch(URL)
 	if len(idMatched) != 2 {
-		return nil, errors.New("cannot find id from url")
+		return nil, errCannotFoundID
 	}
 
 	noRe := regexp.MustCompile(`no=([^&]*)`)
 	noMatched := noRe.FindStringSubmatch(URL)
 	if len(noMatched) != 2 {
-		return nil, errors.New("cannot find no from url")
+		return nil, errCannotFoundNo
 	}
 
 	req, err := http.NewRequest("GET", URL, form(map[string]string{
@@ -214,7 +218,7 @@ func getFilename(resp *http.Response) (string, error) {
 	contentDisposition := resp.Header.Get("Content-Disposition")
 	matched := filenameRe.FindStringSubmatch(contentDisposition)
 	if len(matched) != 2 {
-		return "", errors.New("cannot find filename from content-position")
+		return "", errCannotFoundFilename
 	}
 	return matched[1], nil
 }
