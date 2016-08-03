@@ -141,6 +141,9 @@ func process(URL string) error {
 
 	// second, hashing for check duplicate
 	checksum := bytesToMD5(body)
+	if history.image.get(checksum) == true {
+		return errDuplicateImage
+	}
 
 	// get filename,
 	filename, err := getFilename(resp)
@@ -148,15 +151,12 @@ func process(URL string) error {
 		return err
 	}
 
-	// if the image do not duplicated, return error
-	if history.image.get(checksum) == true {
-		return errDuplicateImage
-	}
-
-	// save it.
+	// and save it
 	if err := saveImage(body, filename); err != nil {
 		return err
 	}
+
+	// and add to image history
 	history.image.set(checksum, true)
 	return nil
 }
