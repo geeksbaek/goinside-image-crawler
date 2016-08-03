@@ -21,19 +21,34 @@ import (
 	"github.com/geeksbaek/goinside"
 )
 
+type mutexMap struct {
+	storage map[string]bool
+	mutex   *sync.RWMutex
+}
+
+func (m *mutexMap) set(key string, value bool) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.storage[key] = value
+}
+
+func (m *mutexMap) get(key string) bool {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	return m.storage[key]
+}
+
 var (
 	flagGall              = flag.String("gall", "", "http://m.dcinside.com/list.php?id=programming")
 	defaultImageDirectory = "image"
 	duration              = time.Second * 5
 
 	history = struct {
-		article map[string]bool
-		image   map[string]bool
-		mutex   *sync.Mutex
+		article *mutexMap
+		image   *mutexMap
 	}{
-		article: map[string]bool{},
-		image:   map[string]bool{},
-		mutex:   new(sync.Mutex),
+		article: &mutexMap{map[string]bool{}, new(sync.RWMutex)},
+		image:   &mutexMap{map[string]bool{}, new(sync.RWMutex)},
 	}
 )
 
@@ -45,9 +60,7 @@ func init() {
 	}
 	filepath.Walk(root+"/"+defaultImageDirectory, func(path string, f os.FileInfo, err error) error {
 		if checksum, err := fileToMD5(path); err == nil {
-			history.mutex.Lock()
-			defer history.mutex.Unlock()
-			history.image[checksum] = true
+			history.image.set(checksum, true)
 		}
 		return nil
 	})
@@ -87,16 +100,25 @@ func iterArticles(articles []*goinside.Article) {
 			continue
 		}
 		// and passing the images to process()
-		for _, image := range article.Images {
-			go func(URL string) {
-				log.Printf("#%v article has an image. process start.\n", article.Number)
-				if err := process(URL, article.Number); err != nil {
+		go func(article *goinside.Article) {
+			// if you already seen this article, return function
+			if history.article.get(article.Number) == true {
+				return
+			}
+
+			log.Printf("#%v article has an image. process start.\n", article.Number)
+
+			for _, imageURL := range article.Images {
+				if err := process(imageURL, article.Number); err != nil {
 					log.Printf("#%v article process failed. %v", article.Number, err)
-				} else {
-					log.Printf("#%v article process succeed.", article.Number)
+					return
 				}
-			}(image)
-		}
+			}
+
+			history.article.set(article.Number, true)
+			log.Printf("#%v article process succeed.", article.Number)
+
+		}(article)
 	}
 }
 
@@ -122,16 +144,8 @@ func process(URL, articleNumber string) error {
 		return err
 	}
 
-	history.mutex.Lock()
-	defer history.mutex.Unlock()
-
-	switch {
-	// if you already seen this article, return error
-	case history.article[articleNumber] == true:
-		return errors.New("this article already seen")
 	// if the image do not duplicated, return error
-	case history.image[checksum] == true:
-		history.article[articleNumber] = true
+	if history.image.get(checksum) == true {
 		return errors.New("it's a duplicated image")
 	}
 
@@ -139,8 +153,7 @@ func process(URL, articleNumber string) error {
 	if err := saveImage(body, filename); err != nil {
 		return err
 	}
-	history.article[articleNumber] = true
-	history.image[checksum] = true
+	history.image.set(checksum, true)
 	return nil
 }
 
