@@ -13,7 +13,7 @@ go get github.com/geeksbaek/goinside-image-crawler
 goinside-image-crawler.exe -gall http://gall.dcinside.com/board/lists/?id=programming
 ```
 
-### update 2016-08-05
+### [update 2016-08-05](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.1)
 프로그램이 다시 시작할 때마다 `image` 디렉토리의 이미지들을 다시 hashing하는 일을 막기 위해 hash strirng을 이미지 파일 이름으로 사용하도록 변경하였습니다. 기존에 `image` 디렉토리에 존재하는 파일 중, 확장자를 제외한 파일 이름의 길이가 40(sha-1 hash string length)이 아닌 파일은 hash string이 적용되지 않은 파일로 간주하고 hashing 후 해당 파일 이름을 hash string으로 변경하는 작업을 거치게 됩니다.
 
 Jongyeol Baek <geeksbaek@gmail.com>
