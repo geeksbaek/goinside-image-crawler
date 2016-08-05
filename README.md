@@ -15,6 +15,9 @@ goinside-image-crawler.exe -gall http://gall.dcinside.com/board/lists/?id=progra
 
 ## Update
 
+### [1.0.4](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.4)
+img가 아닌 다른 html element까지 image로 파싱하는 문제를 goinside에서 수정하였습니다.
+
 ### [1.0.3](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.3)
 이미지가 저장되는 디렉토리 구조를 변경하였습니다. 기존에 `image` 디렉토리에 모두 저장되던 방식 대신, `images` 디렉토리에 해당 갤러리의 id를 이름으로 가지는 하위 디렉토리가 생성되고, 이곳에 해당 갤러리의 이미지를 저장하게 됩니다. 예를 들어 프로그래밍 갤러리의 경우, `images/programming` 디렉토리에 이미지가 저장됩니다.
 
