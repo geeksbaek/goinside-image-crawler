@@ -2,10 +2,11 @@ package main
 
 import (
 	"bytes"
-	"crypto/md5"
+	"crypto/sha1"
 	"encoding/hex"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -40,7 +41,7 @@ func (m *mutexMap) get(key string) bool {
 
 var (
 	flagGall              = flag.String("gall", "", "http://m.dcinside.com/list.php?id=programming")
-	defaultImageDirectory = "image"
+	defaultImageDirectory = "./image"
 	duration              = time.Second * 5
 
 	history = struct {
@@ -55,20 +56,48 @@ var (
 	errCannotFoundID       = errors.New("cannot found id from url")
 	errCannotFoundNo       = errors.New("cannot found no from url")
 	errCannotFoundFilename = errors.New("cannot found filename from content-position")
+
+	idRe = regexp.MustCompile(`id=([^&]*)`)
+	noRe = regexp.MustCompile(`no=([^&]*)`)
 )
 
+// init will crate defalut image directory, and
+// find existing images, and hashing, and add to history.
 func init() {
-	os.Mkdir(defaultImageDirectory, 0700)
-	root, err := filepath.Abs(filepath.Dir(os.Args[0]))
-	if err != nil {
-		panic(err)
-	}
-	filepath.Walk(root+"/"+defaultImageDirectory, func(path string, f os.FileInfo, err error) error {
-		if checksum, err := fileToMD5(path); err == nil {
-			history.image.set(checksum, true)
+	if _, err := os.Stat(defaultImageDirectory); os.IsNotExist(err) {
+		err := os.Mkdir(defaultImageDirectory, 0700)
+		if err != nil {
+			panic(err)
 		}
-		return nil
-	})
+		return
+	}
+	fileRenameToHash := func(path, extension string) (err error) {
+		newpath, err := hashingFile(path)
+		if err != nil {
+			return
+		}
+		newpath = fmt.Sprintf(`%s/%s`, defaultImageDirectory, newpath)
+		newfilename := strings.Join([]string{newpath, extension}, ".")
+		err = os.Rename(path, newfilename)
+		if err != nil {
+			return
+		}
+		return
+	}
+	forEachImages := func(path string, f os.FileInfo, _ error) (err error) {
+		if f.IsDir() {
+			return
+		}
+		filename, extension := splitPath(f.Name())
+		// check filename is not hash.
+		// if not, hashing and rename.
+		if len(filename) != 40 {
+			fileRenameToHash(path, extension)
+		}
+		history.image.set(filename, true)
+		return
+	}
+	filepath.Walk(defaultImageDirectory, forEachImages)
 }
 
 func main() {
@@ -76,159 +105,165 @@ func main() {
 	if *flagGall == "" {
 		log.Fatal("invalid args")
 	}
-
 	log.Printf("target is %s, crawl start.\n", *flagGall)
-
-	// get first list from *flagGall
+	// get first list of *flagGall every tick.
+	// and iterate all articles.
 	ticker := time.Tick(duration)
 	for _ = range ticker {
 		log.Printf("goinside.GetList(%s, 1) called.\n", *flagGall)
 		if list, err := goinside.GetList(*flagGall, 1); err == nil {
-			go iterArticles(list.Articles)
+			go iterate(list.Articles)
 		}
 	}
 }
 
-func iterArticles(articles []*goinside.Article) {
+// if find an image included article, fetching it.
+func iterate(articles []*goinside.Article) {
 	for _, article := range articles {
-		// if article has an image,
-		if !article.HasImage {
-			continue
+		if article.HasImage {
+			go fetchArticle(article)
 		}
-		go func(article *goinside.Article) {
-			// fetching the article,
-			article, err := goinside.GetArticle(article.URL)
-			if err != nil {
-				return
-			}
-			// if you already seen this article, return function
-			if history.article.get(article.Number) == true {
-				return
-			}
-
-			log.Printf("#%v article has an image. process start.\n", article.Number)
-
-			// if not, passing the images to process()
-			for _, imageURL := range article.Images {
-				if err := process(imageURL); err != nil && err != errDuplicateImage {
-					log.Printf("#%v article process failed. %v", article.Number, err)
-					return
-				}
-			}
-
-			history.article.set(article.Number, true)
-			log.Printf("#%v article process succeed.", article.Number)
-
-		}(article)
 	}
 }
 
-func process(URL string) error {
-	// first, fetching image
+func fetchArticle(article *goinside.Article) {
+	article, err := goinside.GetArticle(article.URL)
+	if err != nil {
+		return
+	}
+	// if you already seen this article, return.
+	if history.article.get(article.Number) == true {
+		return
+	}
+	log.Printf("#%v article has an image. process start.\n", article.Number)
+	// if not, passing the images to process()
+	for i, imageURL := range article.Images {
+		if err := process(imageURL); err == errDuplicateImage {
+			log.Printf("#%v (%v/%v) aduplicate image.\n",
+				article.Number, i+1, len(article.Images))
+		} else if err != nil {
+			log.Printf("#%v (%v/%v) process failed. %v\n",
+				article.Number, i+1, len(article.Images), err)
+			return
+		} else {
+			log.Printf("#%v (%v/%v) image has been saved successfully.\n",
+				article.Number, i+1, len(article.Images))
+		}
+	}
+	history.article.set(article.Number, true)
+}
+
+// process will fetching the image, and hashing,
+// and comparing the history with it.
+// if it already exists, return errDuplicateImage.
+// if not, save it, and add to the history.
+func process(URL string) (err error) {
 	resp, err := fetchImage(URL)
 	if err != nil {
-		return err
+		return
 	}
 	defer resp.Body.Close()
-
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return
 	}
-
-	// second, hashing for check duplicate
-	checksum := bytesToMD5(body)
-	if history.image.get(checksum) == true {
-		return errDuplicateImage
+	hash := hashingBytes(body)
+	if history.image.get(hash) == true {
+		err = errDuplicateImage
+		return
 	}
-
-	// get filename,
 	filename, err := getFilename(resp)
 	if err != nil {
-		return err
+		return
 	}
-
-	// and save it
-	if err := saveImage(body, filename); err != nil {
-		return err
+	_, extension := splitPath(filename)
+	filename = strings.Join([]string{hash, extension}, ".")
+	path := fmt.Sprintf(`%s/%s`, defaultImageDirectory, filename)
+	err = saveImage(body, path)
+	if err != nil {
+		return
 	}
-
-	// and add to image history
-	history.image.set(checksum, true)
-	return nil
+	history.image.set(hash, true)
+	return
 }
 
-func fetchImage(URL string) (*http.Response, error) {
-	form := func(m map[string]string) io.Reader {
+func fetchImage(URL string) (resp *http.Response, err error) {
+	matchedID := idRe.FindStringSubmatch(URL)
+	if len(matchedID) != 2 {
+		err = errCannotFoundID
+		return
+	}
+	matchedNO := noRe.FindStringSubmatch(URL)
+	if len(matchedNO) != 2 {
+		err = errCannotFoundNo
+		return
+	}
+	// strangely, dcinside requires these forms to request images.
+	form := func(m map[string]string) (reader io.Reader) {
 		data := url.Values{}
 		for k, v := range m {
 			data.Set(k, v)
 		}
-		return strings.NewReader(data.Encode())
-	}
+		reader = strings.NewReader(data.Encode())
+		return
+	}(map[string]string{
+		"id": matchedID[1],
+		"no": matchedNO[1],
+	})
 
-	idRe := regexp.MustCompile(`id=([^&]*)`)
-	idMatched := idRe.FindStringSubmatch(URL)
-	if len(idMatched) != 2 {
-		return nil, errCannotFoundID
-	}
-
-	noRe := regexp.MustCompile(`no=([^&]*)`)
-	noMatched := noRe.FindStringSubmatch(URL)
-	if len(noMatched) != 2 {
-		return nil, errCannotFoundNo
-	}
-
-	req, err := http.NewRequest("GET", URL, form(map[string]string{
-		"id": idMatched[1],
-		"no": noMatched[1],
-	}))
+	req, err := http.NewRequest("GET", URL, form)
 	if err != nil {
-		return nil, err
+		return
 	}
 	client := &http.Client{}
-	return client.Do(req)
+	resp, err = client.Do(req)
+	return
 }
 
-func bytesToMD5(body []byte) string {
-	hasher := md5.New()
-	hasher.Write(body)
-	return hex.EncodeToString(hasher.Sum(nil))
+func hashingBytes(data []byte) (hash string) {
+	hasher := sha1.New()
+	hasher.Write(data)
+	hash = hex.EncodeToString(hasher.Sum(nil))
+	return
 }
 
-func fileToMD5(path string) (string, error) {
-	file, err := os.Open(path)
+func hashingFile(path string) (hash string, er error) {
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return "", err
+		return
 	}
-	defer file.Close()
-	hasher := md5.New()
-	_, err = io.Copy(hasher, file)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(hasher.Sum(nil)), nil
+	hash = hashingBytes(data)
+	return
 }
 
-func getFilename(resp *http.Response) (string, error) {
+func getFilename(resp *http.Response) (filename string, err error) {
 	filenameRe := regexp.MustCompile(`filename=(.*)`)
 	contentDisposition := resp.Header.Get("Content-Disposition")
 	matched := filenameRe.FindStringSubmatch(contentDisposition)
 	if len(matched) != 2 {
-		return "", errCannotFoundFilename
+		err = errCannotFoundFilename
+		return
 	}
-	return matched[1], nil
+	filename = matched[1]
+	return
 }
 
-func saveImage(body []byte, path string) error {
-	file, err := os.Create(defaultImageDirectory + "/" + path)
+func saveImage(data []byte, path string) (err error) {
+	file, err := os.Create(path)
 	if err != nil {
-		return err
+		return
 	}
-	_, err = io.Copy(file, bytes.NewReader(body))
+	_, err = io.Copy(file, bytes.NewReader(data))
 	if err != nil {
-		return err
+		return
 	}
 	file.Close()
-	return nil
+	return
+}
+
+func splitPath(fullname string) (filename, extension string) {
+	splitedName := strings.Split(fullname, ".")
+	filename = strings.Join(splitedName[:len(splitedName)-1], ".")
+	extension = splitedName[len(splitedName)-1]
+	return
 }
