@@ -139,7 +139,7 @@ func fetchArticle(article *goinside.Article) {
 	// if not, passing the images to process()
 	for i, imageURL := range article.Images {
 		if err := process(imageURL); err == errDuplicateImage {
-			log.Printf("#%v (%v/%v) aduplicate image.\n",
+			log.Printf("#%v (%v/%v) duplicate image.\n",
 				article.Number, i+1, len(article.Images))
 		} else if err != nil {
 			log.Printf("#%v (%v/%v) process failed. %v\n",
