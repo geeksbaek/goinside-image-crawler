@@ -41,7 +41,8 @@ func (m *mutexMap) get(key string) bool {
 
 var (
 	flagGall              = flag.String("gall", "", "http://m.dcinside.com/list.php?id=programming")
-	defaultImageDirectory = "./image"
+	defaultImageDirectory = "./images"
+	imageSubdirectory     = ""
 	duration              = time.Second * 5
 
 	history = struct {
@@ -61,22 +62,54 @@ var (
 	noRe = regexp.MustCompile(`no=([^&]*)`)
 )
 
-// init will crate defalut image directory, and
-// find existing images, and hashing, and add to history.
-func init() {
-	if _, err := os.Stat(defaultImageDirectory); os.IsNotExist(err) {
-		err := os.Mkdir(defaultImageDirectory, 0700)
+func main() {
+	flag.Parse()
+
+	id := getID(*flagGall)
+	imageSubdirectory = fmt.Sprintf(`%s/%s`, defaultImageDirectory, id)
+	mkdir(imageSubdirectory)
+	hashingExistImages(imageSubdirectory)
+
+	log.Printf("target is %s, crawl start.\n", *flagGall)
+	// get first list of *flagGall every tick.
+	// and iterate all articles.
+	ticker := time.Tick(duration)
+	for _ = range ticker {
+		log.Printf("goinside.GetList(%s, 1) called.\n", *flagGall)
+		if list, err := goinside.GetList(*flagGall, 1); err == nil {
+			go iterate(list.Articles)
+		}
+	}
+}
+
+func getID(URL string) (id string) {
+	matched := idRe.FindStringSubmatch(URL)
+	if len(matched) != 2 {
+		panic(errCannotFoundID)
+	}
+	id = matched[1]
+	return
+}
+
+func mkdir(path string) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		err := os.MkdirAll(path, 0700)
 		if err != nil {
 			panic(err)
 		}
 		return
 	}
+}
+
+// init will crate defalut image directory, and
+// find existing images, and hashing, and add to history.
+func hashingExistImages(path string) {
 	fileRenameToHash := func(path, extension string) (err error) {
 		newpath, err := hashingFile(path)
 		if err != nil {
 			return
 		}
-		newpath = fmt.Sprintf(`%s/%s`, defaultImageDirectory, newpath)
+		newpath = fmt.Sprintf(`%s/%s`, path, newpath)
 		newfilename := strings.Join([]string{newpath, extension}, ".")
 		err = os.Rename(path, newfilename)
 		if err != nil {
@@ -97,24 +130,7 @@ func init() {
 		history.image.set(filename, true)
 		return
 	}
-	filepath.Walk(defaultImageDirectory, forEachImages)
-}
-
-func main() {
-	flag.Parse()
-	if *flagGall == "" {
-		log.Fatal("invalid args")
-	}
-	log.Printf("target is %s, crawl start.\n", *flagGall)
-	// get first list of *flagGall every tick.
-	// and iterate all articles.
-	ticker := time.Tick(duration)
-	for _ = range ticker {
-		log.Printf("goinside.GetList(%s, 1) called.\n", *flagGall)
-		if list, err := goinside.GetList(*flagGall, 1); err == nil {
-			go iterate(list.Articles)
-		}
-	}
+	filepath.Walk(path, forEachImages)
 }
 
 // if find an image included article, fetching it.
@@ -178,7 +194,7 @@ func process(URL string) (err error) {
 	}
 	_, extension := splitPath(filename)
 	filename = strings.Join([]string{hash, extension}, ".")
-	path := fmt.Sprintf(`%s/%s`, defaultImageDirectory, filename)
+	path := fmt.Sprintf(`%s/%s`, imageSubdirectory, filename)
 	err = saveImage(body, path)
 	if err != nil {
 		return
@@ -244,7 +260,7 @@ func getFilename(resp *http.Response) (filename string, err error) {
 		err = errCannotFoundFilename
 		return
 	}
-	filename = matched[1]
+	filename = strings.ToLower(matched[1])
 	return
 }
 
