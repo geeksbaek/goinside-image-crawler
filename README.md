@@ -1,6 +1,7 @@
 # goinside-image-crawler
 
-goinside-image-crawler는 디시인사이드 특정 갤러리의 글에 첨부된 이미지를 실시간으로 수집하는 프로그램입니다. 
+goinside-image-crawler는 디시인사이드 특정 갤러리의 글에 첨부된 이미지를 실시간으로 수집하는 프로그램입니다. [goinside](https://github.com/geeksbaek/goinside) 라는 디시인사이드 비공식 API를 사용하여 만들어졌습니다.
+
 프로그램을 실행한 경로에 `images`라는 디렉토리가 생성되며, 입력된 갤러리의 id 이름으로 하위 디렉토리가 이곳에 생성됩니다. 해당 갤러리에서 수집된 이미지는 이 하위 디렉토리로에 저장됩니다. ex) `images/programming`
 
 해쉬로 이미지 중복을 검사하며, 해당 디렉토리 내에 있는 이미지와 중복되는 이미지는 저장하지 않습니다.
