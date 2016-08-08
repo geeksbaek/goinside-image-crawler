@@ -75,8 +75,8 @@ func main() {
 	// and iterate all articles.
 	ticker := time.Tick(duration)
 	for _ = range ticker {
-		log.Printf("goinside.GetList(%s, 1) called.\n", *flagGall)
-		if list, err := goinside.GetList(*flagGall, 1); err == nil {
+		log.Println("Fetching First Page...")
+		if list, err := goinside.FetchList(*flagGall, 1); err == nil {
 			go iterate(list.Articles)
 		}
 	}
@@ -143,7 +143,7 @@ func iterate(articles []*goinside.Article) {
 }
 
 func fetchArticle(article *goinside.Article) {
-	article, err := goinside.GetArticle(article.URL)
+	article, err := goinside.FetchArticle(article.URL)
 	if err != nil {
 		return
 	}
@@ -153,17 +153,18 @@ func fetchArticle(article *goinside.Article) {
 	}
 	log.Printf("#%v article has an image. process start.\n", article.Number)
 	// if not, passing the images to process()
-	for i, imageURL := range article.Images {
+	imageCnt := len(article.Detail.ImageURLs)
+	for i, imageURL := range article.Detail.ImageURLs {
 		if err := process(imageURL); err == errDuplicateImage {
 			log.Printf("#%v (%v/%v) duplicate image.\n",
-				article.Number, i+1, len(article.Images))
+				article.Number, i+1, imageCnt)
 		} else if err != nil {
 			log.Printf("#%v (%v/%v) process failed. %v\n",
-				article.Number, i+1, len(article.Images), err)
+				article.Number, i+1, imageCnt, err)
 			return
 		} else {
 			log.Printf("#%v (%v/%v) image has been saved successfully.\n",
-				article.Number, i+1, len(article.Images))
+				article.Number, i+1, imageCnt)
 		}
 	}
 	history.article.set(article.Number, true)
