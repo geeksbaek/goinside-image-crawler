@@ -15,6 +15,9 @@ goinside-image-crawler.exe -gall http://gall.dcinside.com/board/lists/?id=progra
 
 ## Update
 
+### [1.0.5](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.5)
+goinside API 변경에 따른 코드 변경 및 일부 로그 수정.
+
 ### [1.0.4](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.4)
 img가 아닌 다른 html element까지 image로 파싱하는 문제를 goinside에서 수정하였습니다.
 
