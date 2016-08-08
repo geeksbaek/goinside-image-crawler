@@ -7,7 +7,7 @@ goinside-image-crawler는 디시인사이드 특정 갤러리의 글에 첨부�
 
 ```
 // install
-go get github.com/geeksbaek/goinside-image-crawler
+go get -u github.com/geeksbaek/goinside-image-crawler
 
 // usage
 goinside-image-crawler.exe -gall http://gall.dcinside.com/board/lists/?id=programming
