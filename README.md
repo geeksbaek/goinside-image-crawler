@@ -10,14 +10,19 @@ goinside-image-crawler는 디시인사이드 특정 갤러리의 글에 첨부�
 // install
 go get -u github.com/geeksbaek/goinside-image-crawler
 
-// usage
-goinside-image-crawler.exe -gall http://gall.dcinside.com/board/lists/?id=programming
+// usage #1
+goinside-image-crawler.exe -url http://gall.dcinside.com/board/lists/?id=programming
+
+// usage #2
+goinside-image-crawler.exe -gall programming
 ```
 
 ## Update
 
 ### [1.0.6](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.6)
-일부 게시물에서 이미지 파싱이 제대로 이루어지지 않는 문제를 goinside에서 수정하였습니다.
+일부 게시물에서 이미지 파싱이 제대로 이루어지지 않는 문제를 goinside에서 수정하였습니다. 
+
+프로그램의 사용 방법을 변경하였습니다. 기존에 -gall 인자로 URL을 전달했던 것을, -gall 인자 혹은 -url 인자를 사용하는 것으로 변경하였습니다. 이제 -gall 인자는 갤러리의 ID를 받으며, -url 인자는 기존처럼 URL을 받습니다.
 
 ### [1.0.5](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.5)
 goinside API 변경에 따른 코드 변경 및 일부 로그 수정.
