@@ -16,6 +16,9 @@ goinside-image-crawler.exe -gall http://gall.dcinside.com/board/lists/?id=progra
 
 ## Update
 
+### [1.0.6](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.6)
+일부 게시물에서 이미지 파싱이 제대로 이루어지지 않는 문제를 goinside에서 수정하였습니다.
+
 ### [1.0.5](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.5)
 goinside API 변경에 따른 코드 변경 및 일부 로그 수정.
 
