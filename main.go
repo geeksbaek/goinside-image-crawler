@@ -39,8 +39,13 @@ func (m *mutexMap) get(key string) bool {
 	return m.storage[key]
 }
 
+// flags
 var (
-	flagGall              = flag.String("gall", "", "http://m.dcinside.com/list.php?id=programming")
+	flagURL    = flag.String("url", "", "http://m.dcinside.com/list.php?id=programming")
+	flagGallID = flag.String("gall", "", "programming")
+)
+
+var (
 	defaultImageDirectory = "./images"
 	imageSubdirectory     = ""
 	duration              = time.Second * 5
@@ -54,6 +59,7 @@ var (
 	}
 
 	errDuplicateImage      = errors.New("duplicated image")
+	errInvalidArgs         = errors.New("invalid args")
 	errCannotFoundID       = errors.New("cannot found id from url")
 	errCannotFoundNo       = errors.New("cannot found no from url")
 	errCannotFoundFilename = errors.New("cannot found filename from content-position")
@@ -64,31 +70,39 @@ var (
 
 func main() {
 	flag.Parse()
+	URL, gallID := getID(*flagURL, *flagGallID)
 
-	id := getID(*flagGall)
-	imageSubdirectory = fmt.Sprintf(`%s/%s`, defaultImageDirectory, id)
+	imageSubdirectory = fmt.Sprintf(`%s/%s`, defaultImageDirectory, gallID)
 	mkdir(imageSubdirectory)
 	hashingExistImages(imageSubdirectory)
 
-	log.Printf("target is %s, crawl start.\n", *flagGall)
+	log.Printf("target is %s, crawl start.\n", gallID)
 	// get first list of *flagGall every tick.
 	// and iterate all articles.
 	ticker := time.Tick(duration)
 	for _ = range ticker {
 		log.Println("Fetching First Page...")
-		if list, err := goinside.FetchList(*flagGall, 1); err == nil {
+		if list, err := goinside.FetchList(URL, 1); err == nil {
 			go iterate(list.Articles)
 		}
 	}
 }
 
-func getID(URL string) (id string) {
-	matched := idRe.FindStringSubmatch(URL)
-	if len(matched) != 2 {
-		panic(errCannotFoundID)
+func getID(URL, gallID string) (retURL, retGallID string) {
+	switch {
+	case URL != "" && gallID == "":
+		matched := idRe.FindStringSubmatch(URL)
+		if len(matched) == 2 {
+			retURL = URL
+			retGallID = matched[1]
+			return
+		}
+	case URL == "" && gallID != "":
+		retURL = fmt.Sprintf("http://m.dcinside.com/list.php?id=%v", gallID)
+		retGallID = gallID
+		return
 	}
-	id = matched[1]
-	return
+	panic(errInvalidArgs)
 }
 
 func mkdir(path string) {
