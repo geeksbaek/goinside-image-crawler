@@ -19,6 +19,9 @@ goinside-image-crawler.exe -gall programming
 
 ## Update
 
+### [1.0.7](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.7)
+좀 더 최적화 하였습니다.
+
 ### [1.0.6](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.6)
 일부 게시물에서 이미지 파싱이 제대로 이루어지지 않는 문제를 goinside에서 수정하였습니다. 
 
