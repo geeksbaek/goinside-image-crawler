@@ -47,4 +47,5 @@ Temporary Items
 .apdisk
 
 /image
+/image/*
 *.exe
