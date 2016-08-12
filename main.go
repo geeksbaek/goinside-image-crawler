@@ -115,8 +115,6 @@ func mkdir(path string) {
 	}
 }
 
-// init will crate defalut image directory, and
-// find existing images, and hashing, and add to history.
 func hashingExistImages(path string) {
 	fileRenameToHash := func(path, extension string) (err error) {
 		newpath, err := hashingFile(path)
@@ -168,20 +166,29 @@ func fetchArticle(article *goinside.Article) {
 	log.Printf("#%v article has an image. process start.\n", article.Number)
 	// if not, passing the images to process()
 	imageCnt := len(article.Detail.ImageURLs)
+	successAll := true
+	wg := new(sync.WaitGroup)
+	wg.Add(len(article.Detail.ImageURLs))
 	for i, imageURL := range article.Detail.ImageURLs {
-		if err := process(imageURL); err == errDuplicateImage {
-			log.Printf("#%v (%v/%v) duplicate image.\n",
-				article.Number, i+1, imageCnt)
-		} else if err != nil {
-			log.Printf("#%v (%v/%v) process failed. %v\n",
-				article.Number, i+1, imageCnt, err)
-			return
-		} else {
-			log.Printf("#%v (%v/%v) image has been saved successfully.\n",
-				article.Number, i+1, imageCnt)
-		}
+		i, imageURL := i, imageURL
+		go func() {
+			defer wg.Done()
+			switch process(imageURL) {
+			case errDuplicateImage:
+				log.Printf("#%v (%v/%v) duplicate image.\n", article.Number, i+1, imageCnt)
+			case nil:
+				log.Printf("#%v (%v/%v) image has been saved successfully.\n", article.Number, i+1, imageCnt)
+			default:
+				log.Printf("#%v (%v/%v) process failed. %v\n", article.Number, i+1, imageCnt, err)
+				successAll = false
+			}
+		}()
+
 	}
-	history.article.set(article.Number, true)
+	wg.Wait()
+	if successAll {
+		history.article.set(article.Number, true)
+	}
 }
 
 // process will fetching the image, and hashing,
@@ -230,24 +237,25 @@ func fetchImage(URL string) (resp *http.Response, err error) {
 		return
 	}
 	// strangely, dcinside requires these forms to request images.
-	form := func(m map[string]string) (reader io.Reader) {
-		data := url.Values{}
-		for k, v := range m {
-			data.Set(k, v)
-		}
-		reader = strings.NewReader(data.Encode())
-		return
-	}(map[string]string{
+	form := formMaker(map[string]string{
 		"id": matchedID[1],
 		"no": matchedNO[1],
 	})
-
 	req, err := http.NewRequest("GET", URL, form)
 	if err != nil {
 		return
 	}
 	client := &http.Client{}
 	resp, err = client.Do(req)
+	return
+}
+
+func formMaker(m map[string]string) (reader io.Reader) {
+	data := url.Values{}
+	for k, v := range m {
+		data.Set(k, v)
+	}
+	reader = strings.NewReader(data.Encode())
 	return
 }
 
