@@ -160,7 +160,7 @@ func fetchArticle(item *goinside.ListItem) {
 		return
 	}
 	// if you already seen this article, return.
-	if history.article.get(fmt.Sprint(item.Number)) == true {
+	if history.article.get(item.Number) == true {
 		return
 	}
 	log.Printf("#%v article has an image. process start.\n", item.Number)
@@ -187,7 +187,7 @@ func fetchArticle(item *goinside.ListItem) {
 	}
 	wg.Wait()
 	if successAll {
-		history.article.set(fmt.Sprint(item.Number), true)
+		history.article.set(item.Number, true)
 	}
 }
 
