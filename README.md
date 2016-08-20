@@ -25,6 +25,9 @@ $ goinside-image-crawler.exe -gall programming
 
 ## Update
 
+### [1.0.8](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.8)
+goinside 패키지 업데이트를 적용한 바이너리입니다.
+
 ### [1.0.7](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.7)
 좀 더 최적화 하였습니다.
 
