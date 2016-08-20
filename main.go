@@ -81,9 +81,9 @@ func main() {
 	// and iterate all articles.
 	ticker := time.Tick(duration)
 	for _ = range ticker {
-		log.Println("Fetching First Page...")
+		log.Printf("Fetching First Page of %vgox...\n", gallID)
 		if list, err := goinside.FetchList(URL, 1); err == nil {
-			go iterate(list.Articles)
+			go iterate(list.Items)
 		}
 	}
 }
@@ -146,7 +146,7 @@ func hashingExistImages(path string) {
 }
 
 // if find an image included article, fetching it.
-func iterate(articles []*goinside.Article) {
+func iterate(articles []*goinside.ListItem) {
 	for _, article := range articles {
 		if article.HasImage {
 			go fetchArticle(article)
@@ -154,32 +154,32 @@ func iterate(articles []*goinside.Article) {
 	}
 }
 
-func fetchArticle(article *goinside.Article) {
-	article, err := goinside.FetchArticle(article.URL)
+func fetchArticle(item *goinside.ListItem) {
+	imageURLs, err := item.FetchImageURLs()
 	if err != nil {
 		return
 	}
 	// if you already seen this article, return.
-	if history.article.get(article.Number) == true {
+	if history.article.get(fmt.Sprint(item.Number)) == true {
 		return
 	}
-	log.Printf("#%v article has an image. process start.\n", article.Number)
+	log.Printf("#%v article has an image. process start.\n", item.Number)
 	// if not, passing the images to process()
-	imageCnt := len(article.Detail.ImageURLs)
+	imageCount := len(imageURLs)
 	successAll := true
 	wg := new(sync.WaitGroup)
-	wg.Add(len(article.Detail.ImageURLs))
-	for i, imageURL := range article.Detail.ImageURLs {
+	wg.Add(len(imageURLs))
+	for i, imageURL := range imageURLs {
 		i, imageURL := i, imageURL
 		go func() {
 			defer wg.Done()
 			switch process(imageURL) {
 			case errDuplicateImage:
-				log.Printf("#%v (%v/%v) duplicate image.\n", article.Number, i+1, imageCnt)
+				log.Printf("#%v (%v/%v) duplicate image.\n", item.Number, i+1, imageCount)
 			case nil:
-				log.Printf("#%v (%v/%v) image has been saved successfully.\n", article.Number, i+1, imageCnt)
+				log.Printf("#%v (%v/%v) image has been saved successfully.\n", item.Number, i+1, imageCount)
 			default:
-				log.Printf("#%v (%v/%v) process failed. %v\n", article.Number, i+1, imageCnt, err)
+				log.Printf("#%v (%v/%v) process failed. %v\n", item.Number, i+1, imageCount, err)
 				successAll = false
 			}
 		}()
@@ -187,7 +187,7 @@ func fetchArticle(article *goinside.Article) {
 	}
 	wg.Wait()
 	if successAll {
-		history.article.set(article.Number, true)
+		history.article.set(fmt.Sprint(item.Number), true)
 	}
 }
 
