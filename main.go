@@ -81,7 +81,7 @@ func main() {
 	// and iterate all articles.
 	ticker := time.Tick(duration)
 	for _ = range ticker {
-		log.Printf("Fetching First Page of %vgox...\n", gallID)
+		log.Printf("Fetching First Page of %v...\n", gallID)
 		if list, err := goinside.FetchList(URL, 1); err == nil {
 			go iterate(list.Items)
 		}
