@@ -163,7 +163,6 @@ func fetchArticle(item *goinside.ListItem) {
 	if history.article.get(item.Number) == true {
 		return
 	}
-	log.Printf("#%v article has an image. process start.\n", item.Number)
 	// if not, passing the images to process()
 	imageCount := len(imageURLs)
 	successAll := true
@@ -175,11 +174,11 @@ func fetchArticle(item *goinside.ListItem) {
 			defer wg.Done()
 			switch process(imageURL) {
 			case errDuplicateImage:
-				log.Printf("#%v (%v/%v) duplicate image.\n", item.Number, i+1, imageCount)
+				log.Printf("%v (%v/%v) Dup.\n", item.Subject, i+1, imageCount)
 			case nil:
-				log.Printf("#%v (%v/%v) image has been saved successfully.\n", item.Number, i+1, imageCount)
+				log.Printf("%v (%v/%v) OK.\n", item.Subject, i+1, imageCount)
 			default:
-				log.Printf("#%v (%v/%v) process failed. %v\n", item.Number, i+1, imageCount, err)
+				log.Printf("%v (%v/%v) Failed. %v\n", item.Subject, i+1, imageCount, err)
 				successAll = false
 			}
 		}()

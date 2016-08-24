@@ -46,6 +46,6 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-/image
-/image/*
+/images
+/images/*
 *.exe
