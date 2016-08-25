@@ -1,4 +1,5 @@
-# goinside-image-crawler [![Build Status](https://travis-ci.org/geeksbaek/goinside-image-crawler.svg?branch=master)](https://travis-ci.org/geeksbaek/goinside-image-crawler)
+# goinside-image-crawler 
+[![Build Status](https://travis-ci.org/geeksbaek/goinside-image-crawler.svg?branch=master)](https://travis-ci.org/geeksbaek/goinside-image-crawler)
 
 goinside-image-crawler는 [goinside](https://github.com/geeksbaek/goinside) 기반으로 만든, 특정 갤러리의 첫 페이지에 있는 이미지들을 실시간으로 수집하는 프로그램입니다.
 
