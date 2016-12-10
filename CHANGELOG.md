@@ -1,5 +1,8 @@
 # Update
 
+## [1.1.0](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.1.0)
+디시인사이드에서 글을 읽어오는 방법이 변경됨에 따른 대응
+
 ## [1.0.9](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.0.9)
 버그 수정
 

@@ -49,3 +49,5 @@ Temporary Items
 /images
 /images/*
 *.exe
+
+goinside-image-crawler*
