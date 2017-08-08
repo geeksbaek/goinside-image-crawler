@@ -194,58 +194,24 @@ func fetchArticle(item *goinside.ListItem) {
 // and comparing the history with it.
 // if it already exists, return errDuplicateImage.
 // if not, save it, and add to the history.
-func process(URL string) (err error) {
-	resp, err := fetchImage(URL)
+func process(URL goinside.ImageURLType) (err error) {
+	image, filename, err := URL.Fetch()
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-	hash := hashingBytes(body)
+	hash := hashingBytes(image)
 	if history.image.get(hash) == true {
 		err = errDuplicateImage
-		return
-	}
-	filename, err := getFilename(resp)
-	if err != nil {
 		return
 	}
 	_, extension := splitPath(filename)
 	filename = strings.Join([]string{hash, extension}, ".")
 	path := fmt.Sprintf(`%s/%s`, imageSubdirectory, filename)
-	err = saveImage(body, path)
+	err = saveImage(image, path)
 	if err != nil {
 		return
 	}
 	history.image.set(hash, true)
-	return
-}
-
-func fetchImage(URL string) (resp *http.Response, err error) {
-	matchedID := idRe.FindStringSubmatch(URL)
-	if len(matchedID) != 2 {
-		err = errCannotFoundID
-		return
-	}
-	matchedNO := noRe.FindStringSubmatch(URL)
-	if len(matchedNO) != 2 {
-		err = errCannotFoundNo
-		return
-	}
-	// strangely, dcinside requires these forms to request images.
-	form := formMaker(map[string]string{
-		"id": matchedID[1],
-		"no": matchedNO[1],
-	})
-	req, err := http.NewRequest("GET", URL, form)
-	if err != nil {
-		return
-	}
-	client := &http.Client{}
-	resp, err = client.Do(req)
 	return
 }
 
