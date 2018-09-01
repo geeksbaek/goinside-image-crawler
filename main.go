@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,6 +19,7 @@ import (
 	"time"
 
 	"github.com/geeksbaek/goinside"
+	"github.com/sirupsen/logrus"
 )
 
 type mutexMap struct {
@@ -76,13 +76,15 @@ func main() {
 	mkdir(imageSubdirectory)
 	hashingExistImages(imageSubdirectory)
 
-	log.Printf("target is %s, crawl start.\n", gallID)
+	logrus.Infof("target is %s, crawl start.", gallID)
 	// get first list of *flagGall every tick.
 	// and iterate all articles.
 	ticker := time.Tick(duration)
-	for _ = range ticker {
-		log.Printf("Fetching First Page of %v...\n", gallID)
-		if list, err := goinside.FetchList(URL, 1); err == nil {
+	for range ticker {
+		logrus.Infof("Fetching First Page of %v...", gallID)
+		if list, err := goinside.FetchList(gallID, 1); err != nil {
+			logrus.Errorf("%v: %v", URL, err)
+		} else {
 			go iterate(list.Items)
 		}
 	}
@@ -174,11 +176,11 @@ func fetchArticle(item *goinside.ListItem) {
 			defer wg.Done()
 			switch process(imageURL) {
 			case errDuplicateImage:
-				log.Printf("%v (%v/%v) Dup.\n", item.Subject, i+1, imageCount)
+				logrus.Infof("%v (%v/%v) Dup.", item.Subject, i+1, imageCount)
 			case nil:
-				log.Printf("%v (%v/%v) OK.\n", item.Subject, i+1, imageCount)
+				logrus.Infof("%v (%v/%v) OK.", item.Subject, i+1, imageCount)
 			default:
-				log.Printf("%v (%v/%v) Failed. %v\n", item.Subject, i+1, imageCount, err)
+				logrus.Infof("%v (%v/%v) Failed. %v", item.Subject, i+1, imageCount, err)
 				successAll = false
 			}
 		}()
