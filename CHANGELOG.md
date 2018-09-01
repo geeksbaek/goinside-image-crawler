@@ -1,6 +1,6 @@
 # Update
 
-## [1.1.0](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.2.0)
+## [1.2.0](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.2.0)
 app_id 이슈를 해결하여 다시 정상적으로 동작합니다.
 
 ## [1.1.0](https://github.com/geeksbaek/goinside-image-crawler/releases/tag/1.1.0)
