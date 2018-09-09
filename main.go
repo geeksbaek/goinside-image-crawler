@@ -2,15 +2,10 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha1"
-	"encoding/hex"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -18,8 +13,10 @@ import (
 	"sync"
 	"time"
 
+	vision "cloud.google.com/go/vision/apiv1"
 	"github.com/geeksbaek/goinside"
 	"github.com/sirupsen/logrus"
+	pb "google.golang.org/genproto/googleapis/cloud/vision/v1"
 )
 
 type mutexMap struct {
@@ -58,6 +55,7 @@ var (
 		image:   &mutexMap{map[string]bool{}, new(sync.RWMutex)},
 	}
 
+	errFileSizeTooSmall    = errors.New("File size is too small")
 	errDuplicateImage      = errors.New("duplicated image")
 	errInvalidArgs         = errors.New("invalid args")
 	errCannotFoundID       = errors.New("cannot found id from url")
@@ -70,10 +68,15 @@ var (
 
 func main() {
 	flag.Parse()
-	URL, gallID := getID(*flagURL, *flagGallID)
+	URL, gallID := mustGetID(*flagURL, *flagGallID)
 
 	imageSubdirectory = fmt.Sprintf(`%s/%s`, defaultImageDirectory, gallID)
-	mkdir(imageSubdirectory)
+	mkdir(imageSubdirectory + "/ADULT_0_UNKNOWN")
+	mkdir(imageSubdirectory + "/ADULT_1_VERY_UNLIKELY")
+	mkdir(imageSubdirectory + "/ADULT_2_UNLIKELY")
+	mkdir(imageSubdirectory + "/ADULT_3_POSSIBLE")
+	mkdir(imageSubdirectory + "/ADULT_4_LIKELY")
+	mkdir(imageSubdirectory + "/ADULT_5_VERY_LIKELY")
 	hashingExistImages(imageSubdirectory)
 
 	logrus.Infof("target is %s, crawl start.", gallID)
@@ -90,47 +93,26 @@ func main() {
 	}
 }
 
-func getID(URL, gallID string) (retURL, retGallID string) {
-	switch {
-	case URL != "" && gallID == "":
-		matched := idRe.FindStringSubmatch(URL)
-		if len(matched) == 2 {
-			retURL = URL
-			retGallID = matched[1]
-			return
-		}
-	case URL == "" && gallID != "":
-		retURL = fmt.Sprintf("http://m.dcinside.com/list.php?id=%v", gallID)
-		retGallID = gallID
-		return
-	}
-	panic(errInvalidArgs)
-}
+func detectSafeSearch(f []byte) (pb.Likelihood, error) {
+	ctx := context.Background()
 
-func mkdir(path string) {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		err := os.MkdirAll(path, 0700)
-		if err != nil {
-			panic(err)
-		}
-		return
+	client, err := vision.NewImageAnnotatorClient(ctx)
+	if err != nil {
+		return 0, err
 	}
+
+	image, err := vision.NewImageFromReader(bytes.NewReader(f))
+	if err != nil {
+		return 0, err
+	}
+	props, err := client.DetectSafeSearch(ctx, image, nil)
+	if err != nil {
+		return 0, err
+	}
+	return props.Adult, nil
 }
 
 func hashingExistImages(path string) {
-	fileRenameToHash := func(path, extension string) (err error) {
-		newpath, err := hashingFile(path)
-		if err != nil {
-			return
-		}
-		newpath = fmt.Sprintf(`%s/%s`, path, newpath)
-		newfilename := strings.Join([]string{newpath, extension}, ".")
-		err = os.Rename(path, newfilename)
-		if err != nil {
-			return
-		}
-		return
-	}
 	forEachImages := func(path string, f os.FileInfo, _ error) (err error) {
 		if f.IsDir() {
 			return
@@ -174,7 +156,8 @@ func fetchArticle(item *goinside.ListItem) {
 		i, imageURL := i, imageURL
 		go func() {
 			defer wg.Done()
-			switch process(imageURL) {
+			err := process(imageURL)
+			switch err {
 			case errDuplicateImage:
 				logrus.Infof("%v (%v/%v) Dup.", item.Subject, i+1, imageCount)
 			case nil:
@@ -206,70 +189,24 @@ func process(URL goinside.ImageURLType) (err error) {
 		err = errDuplicateImage
 		return
 	}
+	defer history.image.set(hash, true)
+
 	_, extension := splitPath(filename)
 	filename = strings.Join([]string{hash, extension}, ".")
-	path := fmt.Sprintf(`%s/%s`, imageSubdirectory, filename)
-	err = saveImage(image, path)
+
+	if len(image) < 40000 {
+		return errFileSizeTooSmall
+	}
+
+	adultLikelihood, err := detectSafeSearch(image)
 	if err != nil {
 		return
 	}
-	history.image.set(hash, true)
-	return
-}
 
-func formMaker(m map[string]string) (reader io.Reader) {
-	data := url.Values{}
-	for k, v := range m {
-		data.Set(k, v)
-	}
-	reader = strings.NewReader(data.Encode())
-	return
-}
-
-func hashingBytes(data []byte) (hash string) {
-	hasher := sha1.New()
-	hasher.Write(data)
-	hash = hex.EncodeToString(hasher.Sum(nil))
-	return
-}
-
-func hashingFile(path string) (hash string, er error) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
+	path := fmt.Sprintf(`%s/ADULT_%d_%s/%s`,
+		imageSubdirectory, adultLikelihood, adultLikelihood.String(), filename)
+	if err = saveImage(image, path); err != nil {
 		return
 	}
-	hash = hashingBytes(data)
-	return
-}
-
-func getFilename(resp *http.Response) (filename string, err error) {
-	filenameRe := regexp.MustCompile(`filename=(.*)`)
-	contentDisposition := resp.Header.Get("Content-Disposition")
-	matched := filenameRe.FindStringSubmatch(contentDisposition)
-	if len(matched) != 2 {
-		err = errCannotFoundFilename
-		return
-	}
-	filename = strings.ToLower(matched[1])
-	return
-}
-
-func saveImage(data []byte, path string) (err error) {
-	file, err := os.Create(path)
-	if err != nil {
-		return
-	}
-	_, err = io.Copy(file, bytes.NewReader(data))
-	if err != nil {
-		return
-	}
-	file.Close()
-	return
-}
-
-func splitPath(fullname string) (filename, extension string) {
-	splitedName := strings.Split(fullname, ".")
-	filename = strings.Join(splitedName[:len(splitedName)-1], ".")
-	extension = splitedName[len(splitedName)-1]
 	return
 }
