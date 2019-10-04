@@ -174,7 +174,7 @@ func fetchArticle(item *goinside.ListItem) {
 		i, imageURL := i, imageURL
 		go func() {
 			defer wg.Done()
-			switch process(imageURL) {
+			switch process(imageURL, item) {
 			case errDuplicateImage:
 				logrus.Infof("%v (%v/%v) Dup.", item.Subject, i+1, imageCount)
 			case nil:
@@ -196,7 +196,7 @@ func fetchArticle(item *goinside.ListItem) {
 // and comparing the history with it.
 // if it already exists, return errDuplicateImage.
 // if not, save it, and add to the history.
-func process(URL goinside.ImageURLType) (err error) {
+func process(URL goinside.ImageURLType, item *goinside.ListItem) (err error) {
 	image, filename, err := URL.Fetch()
 	if err != nil {
 		return
@@ -209,11 +209,19 @@ func process(URL goinside.ImageURLType) (err error) {
 	_, extension := splitPath(filename)
 	filename = strings.Join([]string{hash, extension}, ".")
 	path := fmt.Sprintf(`%s/%s`, imageSubdirectory, filename)
-	err = saveImage(image, path)
-	if err != nil {
-		return
-	}
-	history.image.set(hash, true)
+
+	go func() {
+		<-time.After(time.Minute * 3)
+		if _, err := item.FetchImageURLs(); err != nil {
+			err = saveImage(image, path)
+			if err != nil {
+				logrus.Error(err)
+				return
+			}
+			history.image.set(hash, true)
+		}
+	}()
+
 	return
 }
 
